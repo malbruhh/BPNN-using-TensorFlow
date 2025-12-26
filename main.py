@@ -54,9 +54,7 @@
 # Hidden Layer: 8 neurons, ReLU activation
 # Output Layer: 1 neuron, Sigmoid activation
 
-
-
-#--1 Import library
+#--0 Import library --
 import os
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'      # Turns off oneDNN warning
@@ -156,7 +154,7 @@ def main():
     Y = df['churn']
     X_train,X_test,y_train,y_test = train_test_split(X,Y,test_size=0.2, stratify=Y, random_state=42)
     
-    #--3 Outlier Treatment
+    #--3 Outlier Treatment--
     #Log Transformation (Both Train and Test set)--
     print(f'''Using Log Transformation for outlier treatment on columns:
           - seconds_of_use
@@ -217,18 +215,20 @@ def main():
         validation_split=0.2, # Uses 20% to check overfitting
         verbose=1
     )
-    loss, accuracy, precision, recall= model.evaluate(X_test_final, y_test_final)
-    print(f"Test Accuracy: {accuracy*100:.2f}%")
-    
+    loss, accuracy, precision, recall= model.evaluate(X_test_final, y_test_final)    
     y_hat = model.predict(X_test_final)
     y_hat = [0 if val < 0.5 else 1 for val in y_hat] # <0.5 = not churn, >=0.5 = churn
-    print(f'Accuracy: {accuracy_score(y_test_final, y_hat)*100:.2f} %') #test accuracy with test set
+    print(f"Test Accuracy: {accuracy*100:.2f}%")
    
     #--5 Plotting Graphs--
+    val_loss = history.history['val_loss']
+    train_loss = history.history['loss']
+    train_acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
     #1. Loss Curve 
     plt.figure(figsize=(8, 5))
-    plt.plot(history.history['loss'], label='Training Loss')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.plot(train_loss, label='Training Loss')
+    plt.plot(val_loss, label='Validation Loss')
     plt.title('Model Loss (Learning Curve)')
     plt.ylabel('Loss')
     plt.xlabel('Epoch')
@@ -236,6 +236,19 @@ def main():
     plt.grid(True)
     plt.show()
     
+    epochs = range(1, len(train_acc) + 1)
+
+    # 2. Plot Training and Validation Accuracy
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, train_acc, 'bo-', label='Training Accuracy') # 'bo-' blue dots and lines
+    plt.plot(epochs, val_acc, 'ro-', label='Validation Accuracy') # 'ro-' red dots and lines
+
+    plt.title('Training and Validation Accuracy Over Epochs')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
     #2. Confusion Matrix Heatmap
     cm = confusion_matrix(y_test_final, y_hat)
     plt.figure(figsize=(6, 5))

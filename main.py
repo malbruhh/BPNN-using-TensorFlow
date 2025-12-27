@@ -112,6 +112,111 @@ def detect_outliers_iqr(df, k=1.5):
         }
     return outlier_info
 
+#-- 1st Model
+# Optimizer: Adam - adaptive learning rate algorithm
+# Loss Function: Mean Squared Error (MSE)
+def NN_adam_MSE(X_train_final, y_train_final, X_test_final, y_test_final):
+    # Input Layer: 12 neurons (features)
+    # Hidden Layer: 8 neurons, ReLU
+    # Output Layer: 1 neuron, Sigmoid 
+    model = Sequential()
+    model.add(Input(shape=(12,)))
+    model.add(Dense(units=8, activation='relu', name='hidden_layer'))
+    model.add(Dense(units=1, activation='sigmoid', name='output_layer'))
+    
+    model.summary()
+    model.compile(optimizer = 'adam', loss='mean_squared_error', metrics=['accuracy', Recall(), Precision()])
+        
+    #--4 Model Training: Fit, Predict and Evaluate--
+    EPOCHS = 500
+    BATCH_SIZE = 32
+    history = model.fit(
+        X_train_final, 
+        y_train_final, 
+        epochs=EPOCHS, 
+        batch_size=BATCH_SIZE, 
+        validation_split=0.2, # Uses 20% to check overfitting
+        verbose=1
+    )
+    loss, accuracy, precision, recall= model.evaluate(X_test_final, y_test_final)    
+    y_hat = model.predict(X_test_final)
+    y_hat = [0 if val < 0.5 else 1 for val in y_hat] # <0.5 = not churn, >=0.5 = churn
+    print(f"Test Accuracy: {accuracy*100:.2f}%")
+    return history, y_hat
+
+#-- 2nd Model
+# Optimizer: Stochastic Gradient Descent (SGD) - constant learning rate: 0.01
+# Loss Function: Binary Cross Entropy (BCE)
+def NN_sgd_BCE(X_train_final, y_train_final, X_test_final, y_test_final):
+    # Input Layer: 12 neurons (features)
+    # Hidden Layer: 8 neurons, ReLU
+    # Output Layer: 1 neuron, Sigmoid 
+    model = Sequential()
+    model.add(Input(shape=(12,)))
+    model.add(Dense(units=8, activation='relu', name='hidden_layer'))
+    model.add(Dense(units=1, activation='sigmoid', name='output_layer'))
+    
+    model.summary()
+    model.compile(optimizer = 'sgd', learning_rate=0.01, loss='binary_crossentropy', metrics=['accuracy', Recall(), Precision()])
+        
+    #--4 Model Training: Fit, Predict and Evaluate--
+    EPOCHS = 500
+    BATCH_SIZE = 32
+    history = model.fit(
+        X_train_final, 
+        y_train_final, 
+        epochs=EPOCHS, 
+        batch_size=BATCH_SIZE, 
+        validation_split=0.2, # Uses 20% to check overfitting
+        verbose=1
+    )
+    loss, accuracy, precision, recall= model.evaluate(X_test_final, y_test_final)    
+    y_hat = model.predict(X_test_final)
+    y_hat = [0 if val < 0.5 else 1 for val in y_hat] # <0.5 = not churn, >=0.5 = churn
+    print(f"Test Accuracy: {accuracy*100:.2f}%")
+    return history, y_hat
+
+#--Graph: Loss Curve--
+def loss_curve_plot(history):
+    val_loss = history.history['val_loss']
+    train_loss = history.history['loss']
+    plt.figure(figsize=(8, 5))
+    plt.plot(train_loss, label='Training Loss' color='blue')
+    plt.plot(val_loss, label='Validation Loss'color='orange')
+    plt.title('Model Loss (Learning Curve)')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.ylim(0,100)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def accuracy_plot(history):
+    train_acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
+    epochs = range(1, len(train_acc) + 1)
+
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, train_acc, 'bo-', label='Training Accuracy', color='blue') # 'bo-' blue dots and lines
+    plt.plot(epochs, val_acc, 'ro-', label='Validation Accuracy', color='orange') # 'ro-' red dots and lines
+    plt.title('Training and Validation Accuracy Over Epochs')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def confustion_mtx_map(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+            xticklabels=['Stay', 'Churn'], 
+            yticklabels=['Stay', 'Churn'])
+    plt.title('Confusion Matrix: Churn Prediction')
+    plt.ylabel('Actual')
+    plt.xlabel('Predicted')
+    plt.show()
+
 def main():
     #--1 Load Data--
     df = read_file("Dataset/Customer Churn.csv")
@@ -192,73 +297,15 @@ def main():
     y_train_final = y_train.values.reshape(-1, 1)
     y_test_final = y_test.values.reshape(-1, 1)
     
+    #-- 1st Model: MSE Loss --
+    print('\n--- 1st Model: Using Mean Squared Error (MSE)')
+    first_history, first_y_hat = NN_adam_MSE(X_train_final, y_train_final, X_test_final, y_test_final)
     
-    # Input Layer: 12 neurons (features)
-    # Hidden Layer: 8 neurons, ReLU
-    # Output Layer: 1 neuron, Sigmoid 
-    model = Sequential()
-    model.add(Input(shape=(12,)))
-    model.add(Dense(units=8, activation='relu', name='hidden_layer'))
-    model.add(Dense(units=1, activation='sigmoid', name='output_layer'))
-    
-    model.summary()
-    model.compile(optimizer = 'adam', loss='mean_squared_error', metrics=['accuracy', Recall(), Precision()])
-        
-    #--4 Model Training: Fit, Predict and Evaluate--
-    EPOCHS = 500
-    BATCH_SIZE = 32
-    history = model.fit(
-        X_train_final, 
-        y_train_final, 
-        epochs=EPOCHS, 
-        batch_size=BATCH_SIZE, 
-        validation_split=0.2, # Uses 20% to check overfitting
-        verbose=1
-    )
-    loss, accuracy, precision, recall= model.evaluate(X_test_final, y_test_final)    
-    y_hat = model.predict(X_test_final)
-    y_hat = [0 if val < 0.5 else 1 for val in y_hat] # <0.5 = not churn, >=0.5 = churn
-    print(f"Test Accuracy: {accuracy*100:.2f}%")
-   
     #--5 Plotting Graphs--
-    val_loss = history.history['val_loss']
-    train_loss = history.history['loss']
-    train_acc = history.history['accuracy']
-    val_acc = history.history['val_accuracy']
-    #1. Loss Curve 
-    plt.figure(figsize=(8, 5))
-    plt.plot(train_loss, label='Training Loss')
-    plt.plot(val_loss, label='Validation Loss')
-    plt.title('Model Loss (Learning Curve)')
-    plt.ylabel('Loss')
-    plt.xlabel('Epoch')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    loss_curve_plot(first_history) #loss curve graph
+    accuracy_plot(first_history) #accuracy over epochs plot
+    confustion_mtx_map(y_test_final, first_y_hat) #Confusion Matrix Heatmap
     
-    epochs = range(1, len(train_acc) + 1)
-
-    # 2. Plot Training and Validation Accuracy
-    plt.figure(figsize=(8, 5))
-    plt.plot(epochs, train_acc, 'bo-', label='Training Accuracy') # 'bo-' blue dots and lines
-    plt.plot(epochs, val_acc, 'ro-', label='Validation Accuracy') # 'ro-' red dots and lines
-
-    plt.title('Training and Validation Accuracy Over Epochs')
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-    #2. Confusion Matrix Heatmap
-    cm = confusion_matrix(y_test_final, y_hat)
-    plt.figure(figsize=(6, 5))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-            xticklabels=['Stay', 'Churn'], 
-            yticklabels=['Stay', 'Churn'])
-    plt.title('Confusion Matrix: Churn Prediction')
-    plt.ylabel('Actual')
-    plt.xlabel('Predicted')
-    plt.show()
     
 if __name__ == "__main__":
     main()

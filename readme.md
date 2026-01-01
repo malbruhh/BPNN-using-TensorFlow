@@ -29,13 +29,11 @@ The goal of this project is to predict whether a customer will churn based on 12
 ## Model Architectures
 [cite_start]All models utilize **ReLU** activation for hidden layers and **Sigmoid** for the output layer to provide probability-based predictions.
 
-| Feature | Model 1 | Model 2 | Model 3 |
-| :--- | :--- | :--- | :--- |
-| **Hidden Layers** | 1 (8 neurons) | 1 (8 neurons) | 2 (16 → 8 neurons) |
-| **Activation** | ReLU | ReLU | ReLU |
-| **Optimizer** | Adam | SGD | Adam |
-| **Loss Function** | MSE | Binary Cross-Entropy | MSE |
-| **Epochs** | 500 | 500 | 500 |
+| Model | Hidden Layers | Activation | Activation(Output) | Optimizer | Loss Function | Epochs |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Model 1** | 1 (8 neurons) | ReLU | Sigmoid | Adam | Mean Squared Error (MSE) | 500 |
+| **Model 2** | 1 (8 neurons) | ReLU | Sigmoid |SGD | Binary Cross-Entropy(BCE) | 500 |
+| **Model 3** | 2 (16 → 8 neurons) | ReLU | Sigmoid | Adam | Mean Squared Error (MSE) | 500 |
 
 ## Installation & Setup
 

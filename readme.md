@@ -19,6 +19,7 @@ The goal of this project is to predict whether a customer will churn based on 12
 
 ## Data Preprocessing
 The script performs a rigorous preprocessing pipeline to ensure data quality:
+
 **Cleaning:** Column names are standardized to lowercase and underscores
 
 **Deduplication:** Exact duplicate rows are removed to prevent bias
@@ -27,7 +28,7 @@ The script performs a rigorous preprocessing pipeline to ensure data quality:
 
 **Outlier Treatment:** Applied **Log Transformation** (`np.log1p`) to highly skewed usage data (e.g., `seconds_of_use`, `frequency_of_sms`) to normalize distributions.
 
-**Scaling:** Used **Min-Max Scaling** to bring all features into a uniform range of [0, 1][cite: 1].
+**Scaling:** Used **Min-Max Scaling** to bring all features into a uniform range of [0, 1]
 
 **Splitting:** A stratified 80/20 split is used to maintain the class ratio in both training and testing sets.
 

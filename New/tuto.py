@@ -38,26 +38,25 @@ def min_max_transform(df, params: dict):
             
     return df_scaled
 
-def one_hot_encoding(df, col_name:str, drop_first = True):
-    data = df[col_name].toList()
-    categories = sorted(list(set(data)))
+#get categories for train data only
+def get_train_categories(df, col_name):
+    return sorted(list(set(df[col_name].tolist())))
+
+def one_hot_encoding(df, col_name:str, categories, drop_first = True):
+    data = df[col_name].tolist()
     
-    #drop first column
-    if drop_first and len(categories) > 1:
-        categories = categories[1:]
-        
+    active_cats = categories[1:] if drop_first and len(categories) > 1 else categories
+    
     encoded_mtx = []
-    #set all values to 0 first
     for item in data:
-        row = [0] * len(categories)
-        
-        if item in categories:
-            index = categories.index(item)
+        row = [0] * len(active_cats)
+        if item in active_cats:
+            index = active_cats.index(item)
             row[index] = 1
         encoded_mtx.append(row)
     
     #rename column for one hot encoded column
-    new_cols = [f'{col_name}_{category}' for category in categories]
+    new_cols = [f'{col_name}_{cat}' for cat in active_cats]
     #convert back to dataframe
     converted_pd  = pd.DataFrame(encoded_mtx, columns=new_cols,index=df.index)
     print(f'[Changes] Applied one hot encoding for categorical columns')
@@ -109,7 +108,7 @@ def detect_outliers_iqr(df, k=1.5):
         mask = (nums[c] < lower) | (nums[c] > upper)
         outlier_info[c] = {
             'count': int(mask.sum()),
-            'indices': nums.index[mask].toList(),
+            'indices': nums.index[mask].tolist(),
             'lower': float(lower),
             'upper': float(upper)
         }
@@ -169,14 +168,17 @@ def main():
     X_train, X_test = log_transformation(X_train,X_test,cols_to_log)
     
     #3. one hot encoding
+    train_encoded_parts = []
+    test_encoded_parts = []
+    
     categorical = ['complains', 'tariff_plan', 'status']
     for col in categorical:
-        train_encoded = one_hot_encoding(X_train, col, drop_first=True)
-        X_train = X_train.drop(col, axis = 1).join(train_encoded)
+        train_categories = get_train_categories(X_train, col)
+        train_encoded_parts.apend(one_hot_encoding(X_train, col, train_categories, drop_first=True))        
+        test_encoded_parts.append(one_hot_encoding(X_test, col, train_categories, drop_first=True))
         
-        test_encoded = one_hot_encoding(X_test, col, drop_first=True)
-        X_test = X_test.drop(col, axis = 1).join(test_encoded)
-        
+    X_train = X_train.drop(columns=categorical).join(train_encoded_parts)
+    X_test = X_test.drop(columns=categorical).join(test_encoded_parts)
     #4. min-max scaling
     #fit on X_train only
     X_train_scale_params = get_scaling_params(X_train)

@@ -10,9 +10,9 @@ import pandas as pd
 from tabulate import tabulate
 from imblearn.over_sampling import SMOTE
 
-EPOCHS = 50
+EPOCHS = 250
 BATCH_SIZE = 32
-PATIENCE = 10
+PATIENCE = 20
 
 def sigmoid(x):
     return 1 /(1 + np.exp(-x))
@@ -21,17 +21,18 @@ def derivative_sigmoid(sigmoid_x):
     return sigmoid_x * (1- sigmoid_x )
 
 def relu(x):
-    return max(0,x)
+    return np.maximum(0,x)
 
 def derivative_relu(relu_x):
     return (relu_x>0).astype(float)
 
-def split_data(X, Y, test_split=0.2, randomness=None):
+
+def split_data(X, y, test_split=0.2, randomness=None):
     # Set seed for reproducibility
     if randomness is not None:
         np.random.seed(randomness)
     
-    # Ensure X and y are reset/aligned indices for safety
+    # reset X and Y current index
     X = X.reset_index(drop=True)
     y = y.reset_index(drop=True)
     
@@ -112,7 +113,6 @@ def one_hot_encoding(df, col_name:str, categories, drop_first = True):
     new_cols = [f'{col_name}_{cat}' for cat in active_cats]
     #convert back to dataframe
     converted_pd  = pd.DataFrame(encoded_mtx, columns=new_cols,index=df.index)
-    print(f'[Changes] Applied one hot encoding to categorical columns')
     return converted_pd
 
 def log_transformation(df_train, df_test, cols_log: list):
@@ -124,7 +124,6 @@ def log_transformation(df_train, df_test, cols_log: list):
 
 def calculate_adaptive_alpha(weight):
     pass
-
 
 def read_file(file_path: str):
     df = pd.read_csv(file_path)
@@ -169,18 +168,19 @@ def detect_outliers_iqr(df, k=1.5):
 class NeuralNetwork:
     def __init__(self, input_dimension, hidden_nodes = 8, alpha = 0.01):
         self.alpha = alpha
-        self.weight1 = np.random.rand(input_dimension,hidden_nodes) * np.sqrt(2/input_dimension) #dim = inputX8 for hidden using He Initialization
-        self.weight2 = np.random.rand(hidden_nodes, 1) * np.sqrt(2/hidden_nodes) #dim = 8x1 for output
-        
+        self.weight1 = np.random.randn(input_dimension, hidden_nodes) * 0.01
+        self.weight2 = np.random.randn(hidden_nodes, 1) * 0.01
+        self.bias1 = np.zeros((1, hidden_nodes))
+        self.bias2 = np.zeros((1, 1))
         #[0]=Train Loss, [1]=Test Loss, [2]=Train Acc, [3]=Test Acc
         self.history = [[], [], [], []]
     
     def feedforward(self,X):
         #Input -> Hidden
-        self.hidden_input = np.dot(X, self.weight1)
+        self.hidden_input = np.dot(X, self.weight1) + self.bias1
         self.hidden_output = relu(self.hidden_input)
         #Hidden -> Output
-        self.output_input = np.dot(self.hidden_output, self.weight2)
+        self.output_input = np.dot(self.hidden_output, self.weight2) + self.bias2
         self.output = sigmoid(self.output_input)
         return self.output
     
@@ -193,6 +193,10 @@ class NeuralNetwork:
         #update weights
         self.weight2 += self.alpha * np.dot(self.hidden_output.T, delta_output)
         self.weight1 += self.alpha * np.dot(X.T, delta_hidden)
+        
+        #update bias
+        self.bias2 += self.alpha * np.sum(delta_output, axis=0, keepdims=True)
+        self.bias1 += self.alpha * np.sum(delta_hidden, axis=0, keepdims=True)
     
     def calculate_accuracy(self, y_true, y_pred_prob):
         # Threshold at 0.5 for binary classification
@@ -206,9 +210,12 @@ class NeuralNetwork:
         best_loss = float('inf')
         patience_count = 0
         patience = PATIENCE
-        #make sure data in numpy
-        X_tr, y_tr = X_train.values, y_train
-        X_te, y_te = X_test.values, y_test
+        
+        #Convert to numpy and reshape to (samples, 1)
+        X_tr = X_train.values
+        y_tr = np.array(y_train).reshape(-1, 1)
+        X_te = X_test.values
+        y_te = np.array(y_test).reshape(-1, 1)
         
         for epoch in range(epochs):
             output = self.feedforward(X_tr)
@@ -229,8 +236,7 @@ class NeuralNetwork:
             self.history[3].append(test_acc)
             
             #print current state
-            if epoch % 100 == 0:
-                print(f'Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.2f}%')
+            print(f'Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.2f}%')
 
             #stopping condition
             #reach close to zero error 
@@ -244,7 +250,6 @@ class NeuralNetwork:
                 patience_count = 0
             else:
                 patience_count += 1
-            patient_count +=1 if test_loss < best_loss else 0
             if patience_count >= patience:
                 print(f'[Training Stopped] Patience {patience} reached')
                 break
@@ -264,7 +269,7 @@ class NeuralNetwork:
 
 def main():
     #--1 Load Data--
-    df = read_file("Dataset/Customer Churn.csv")
+    df = read_file("..\Dataset\Customer Churn.csv")
     outliers = detect_outliers_iqr(df)
     
     #--2 Outlier Detection--
@@ -301,7 +306,7 @@ def main():
     
     
     #1. split
-    X_train,X_test,y_train,y_test = split_data(X,Y,test_size=0.2, randomness=42)
+    X_train,X_test,y_train,y_test = split_data(X,Y,test_split=0.2, randomness=42)
 
     #2. Log transform
     cols_to_log = [
@@ -324,7 +329,8 @@ def main():
         train_categories = get_train_categories(X_train, col)
         train_encoded_parts.append(one_hot_encoding(X_train, col, train_categories, drop_first=True))        
         test_encoded_parts.append(one_hot_encoding(X_test, col, train_categories, drop_first=True))
-        
+    print(f'[Changes] Applied one hot encoding to categorical columns')
+    
     X_train = X_train.drop(columns=categorical).join(train_encoded_parts)
     X_test = X_test.drop(columns=categorical).join(test_encoded_parts)
     
@@ -334,13 +340,25 @@ def main():
     X_train_scaled = min_max_transform(X_train, X_train_scale_params)
     X_test_scaled = min_max_transform(X_test, X_train_scale_params)
     
+    #5. SMOTE 
     smote = SMOTE(random_state=42)
+    # only applies SMOTE to X_train only
+    X_train_final, y_train_final = smote.fit_resample(X_train_scaled, y_train)
+    print(f"Before SMOTE - Class Distribution: {y_train.value_counts()}")
+    print(f"After SMOTE - Class Distribution: {pd.Series(y_train_final).value_counts()}")
+    print(f"Final training set size: {len(X_train_final)}")
     
-    X_train_final, y_train_final = smote.fit_resample(X_train_final, y_train_final)
+    # #reshape all into dataframe
+    # X_train_final = pd.DataFrame(X_train_scaled, columns=X_train.columns)
+    # X_test_final = pd.DataFrame(X_test_scaled, columns=X_test.columns)
+    # y_train_final = y_train.values.reshape(-1, 1)
+    # y_test_final = y_test.values.reshape(-1, 1)
     
-    #reshape all into dataframe
-    X_train_final = pd.DataFrame(X_train_scaled, columns=X_train.columns)
-    X_test_final = pd.DataFrame(X_test_scaled, columns=X_test.columns)
-    y_train_final = y_train.values.reshape(-1, 1)
-    y_test_final = y_test.values.reshape(-1, 1)
+    input_dim = X_train_final.shape[1]
+    nn = NeuralNetwork(input_dimension= input_dim, hidden_nodes=8, alpha=0.1)
+    history = nn.train(X_train_final, y_train_final, X_test_scaled, y_test)
+    
+if __name__ == '__main__':
+    main()
+    
     

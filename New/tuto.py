@@ -26,6 +26,11 @@ def relu(x):
 def derivative_relu(relu_x):
     return (relu_x>0).astype(float)
 
+def binary_cross_entropy(y_true, y_pred, epsilon=1e-15):
+    # Clip predictions to prevent log(0)
+    y_pred = np.clip(y_pred, epsilon, 1 - epsilon)
+    return -np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+
 
 def split_data(X, y, test_split=0.2, randomness=None):
     # Set seed for reproducibility
@@ -190,6 +195,9 @@ class NeuralNetwork:
         delta_output = error * derivative_sigmoid(output)        
         delta_hidden = np.dot(delta_output, self.weight2.T) * derivative_relu(self.hidden_output)
         
+        max_grad = 5.0
+        delta_output = np.clip(delta_output, -max_grad, max_grad)
+        delta_hidden = np.clip(delta_hidden, -max_grad, max_grad)
         #update weights
         self.weight2 += self.alpha * np.dot(self.hidden_output.T, delta_output)
         self.weight1 += self.alpha * np.dot(X.T, delta_hidden)
@@ -204,56 +212,61 @@ class NeuralNetwork:
         correct = np.sum(predictions == y_true)
         return correct / len(y_true)
     
-    def train(self, X_train, y_train,X_test, y_test):
+    def train(self, X_train, y_train, X_test, y_test):
         epochs = EPOCHS
-        max_error = 0.01 # achieve best accuracy
+        batch_size = BATCH_SIZE  # 32
+        max_error = 0.01
         best_loss = float('inf')
         patience_count = 0
         patience = PATIENCE
         
-        #Convert to numpy and reshape to (samples, 1)
-        X_tr = X_train.values
+        X_tr = X_train.values if isinstance(X_train, pd.DataFrame) else X_train
         y_tr = np.array(y_train).reshape(-1, 1)
-        X_te = X_test.values
+        X_te = X_test.values if isinstance(X_test, pd.DataFrame) else X_test
         y_te = np.array(y_test).reshape(-1, 1)
         
+        n_samples = X_tr.shape[0]
+        
         for epoch in range(epochs):
-            output = self.feedforward(X_tr)
-            self.backpropagation(X_tr, y_tr, output)
+            # Shuffle data each epoch
+            indices = np.random.permutation(n_samples)
+            X_tr_shuffled = X_tr[indices]
+            y_tr_shuffled = y_tr[indices]
             
-            #training metrics
-            train_loss = np.mean(np.square(y_tr - output)) #Mean Squared Error
-            train_acc = np.mean((output > 0.5).astype(int) == y_tr) * 100 #return as list of 0 and 1, then compare with length y_tr 
+            # Mini-batch training
+            for i in range(0, n_samples, batch_size):
+                batch_X = X_tr_shuffled[i:i+batch_size]
+                batch_y = y_tr_shuffled[i:i+batch_size]
+                
+                output = self.feedforward(batch_X)
+                self.backpropagation(batch_X, batch_y, output)
             
-            #Validation
+            # Calculate metrics on full dataset
+            output_full = self.feedforward(X_tr)
+            train_loss = binary_cross_entropy(y_tr, output_full)  # Changed to BCE
+            train_acc = np.mean((output_full > 0.5).astype(int) == y_tr) * 100
+            
             output_test = self.feedforward(X_te)
-            test_loss = np.mean(np.square(y_te - output_test))
+            test_loss = binary_cross_entropy(y_te, output_test)  # Changed to BCE
             test_acc = np.mean((output_test > 0.5).astype(int) == y_te) * 100
-
+            
             self.history[0].append(train_loss)
             self.history[1].append(test_loss)
             self.history[2].append(train_acc)
             self.history[3].append(test_acc)
             
-            #print current state
             print(f'Epoch {epoch + 1}/{epochs} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.2f}%')
-
-            #stopping condition
-            #reach close to zero error 
-            if train_loss < max_error:
-                print(f'[Training Stopped] Max error {max_error} reached')
-                break
             
-            #does not learn(overfit)
             if test_loss < best_loss:
                 best_loss = test_loss
                 patience_count = 0
             else:
                 patience_count += 1
+            
             if patience_count >= patience:
                 print(f'[Training Stopped] Patience {patience} reached')
                 break
-            
+        
         return self.history
     
     def predict(self, X):
@@ -355,7 +368,7 @@ def main():
     # y_test_final = y_test.values.reshape(-1, 1)
     
     input_dim = X_train_final.shape[1]
-    nn = NeuralNetwork(input_dimension= input_dim, hidden_nodes=8, alpha=0.1)
+    nn = NeuralNetwork(input_dimension= input_dim, hidden_nodes=16, alpha=0.1)
     history = nn.train(X_train_final, y_train_final, X_test_scaled, y_test)
     
 if __name__ == '__main__':

@@ -180,36 +180,31 @@ class NeuralNetwork:
         }    
         
     def feedforward(self,X):
-        #Input -> Hidden
-        self.hidden_input = X @ self.weight1 + self.bias1
-        self.hidden_output = relu(self.hidden_input)
-        #Hidden -> Output
-        self.output_input = self.hidden_output @ self.weight2 + self.bias2
-        self.output = sigmoid(self.output_input)
+        self.hidden_Z = X @ self.weight1 + self.bias1
+        self.hidden_A = relu(self.hidden_Z)
+        self.output_Z = self.hidden_A @ self.weight2 + self.bias2
+        self.output_A= sigmoid(self.output_Z)
         
-        return self.output
+        return self.output_A
     
     def backpropagation(self, X, y, output):
-        sample_num = X.shape[0]
+        size = y.shape[0] 
         
-        # output layer gradient Descent(BCE, Sigmoid)
-        delta_output = (output - y)
-        delta_hidden = np.dot(delta_output, self.weight2.T) * derivative_relu(self.hidden_output)
+        d_output = (output - y)
+        d_weight2 = self.hidden_A.T @ d_output / size
+        d_bias2 = np.sum(d_output, axis=0, keepdims=True) / size
         
-        #calc delta(Output: sigmoid , Hidden: ReLU)
-        # Gradient Clipping (helps stability)
-        max_grad = 5.0
-        delta_output = np.clip(delta_output, -max_grad, max_grad)
-        delta_hidden = np.clip(delta_hidden, -max_grad, max_grad)
-
+        d_hidden = d_output @ self.weight2.T
+        d_hidden_Z = d_hidden * derivative_relu(self.hidden_Z)
+        d_weight1 = X.T @ d_hidden_Z / size
+        d_bias1 = np.sum(d_hidden_Z, axis=0, keepdims=True) / size
+        
         #update weights using gradient descent
-        self.weight2 -= self.alpha * self.hidden_output.T @ delta_output / sample_num
-        self.weight1 -= self.alpha * X.T @ delta_hidden / sample_num
-        
-        #update bias
-        self.bias2 -= self.alpha * np.sum(delta_output, axis=0, keepdims=True) / sample_num
-        self.bias1 -= self.alpha * np.sum(delta_hidden, axis=0, keepdims=True) / sample_num
-    
+        self.weight2 -= self.alpha * d_weight2
+        self.bias2 -= self.alpha * d_bias2
+        self.weight1 -= self.alpha * d_weight1
+        self.bias1 -= self.alpha * d_bias1
+
     def calculate_accuracy(self, y_true, y_pred_prob):
         # Threshold at 0.5 for binary classification
         predictions = (y_pred_prob > 0.5).astype(int)
@@ -218,7 +213,7 @@ class NeuralNetwork:
     
     def train(self, X_train, y_train, X_test, y_test):
         epochs = EPOCHS
-        batch_size = BATCH_SIZE  # 32
+        batch_size = BATCH_SIZE
         max_error = 0.01
         best_loss = float('inf')
         patience_count = 0
@@ -247,11 +242,11 @@ class NeuralNetwork:
             
             # Calculate metrics on full dataset
             output_full = self.feedforward(X_tr)
-            train_loss = binary_cross_entropy(y_tr, output_full)  # Changed to BCE
+            train_loss = binary_cross_entropy(y_tr, output_full)
             train_acc = np.mean((output_full > 0.5).astype(int) == y_tr) * 100
             
             output_test = self.feedforward(X_te)
-            test_loss = binary_cross_entropy(y_te, output_test)  # Changed to BCE
+            test_loss = binary_cross_entropy(y_te, output_test)
             test_acc = np.mean((output_test > 0.5).astype(int) == y_te) * 100
             
             self.train_loss.append(train_loss)
@@ -286,7 +281,7 @@ class NeuralNetwork:
         probs = sigmoid(o_input)
         # Return 0 or 1
         return (probs > 0.5).astype(int).flatten()
-
+    
 def accuracy_plot(history):
     train_acc = history['train_acc']
     val_acc = history['test_acc']

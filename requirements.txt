@@ -2,6 +2,4 @@ pandas
 numpy
 matplotlib
 tabulate
-scikit-learn
-tensorflow
 seaborn
